@@ -37,9 +37,9 @@ window.__ModuleLoader__.load({
     // ---------------------------------------------------------------- locale
 
     const ZH = {
-      'title': '双屏布局',
+      'title': '窗口布局',
       'subtitle': '重新排布现有区域，不新增面板',
-      'openPanel': '双屏布局',
+      'openPanel': '窗口布局',
       'control': '布局',
       'close': '关闭',
       'reset': '恢复默认',
@@ -50,23 +50,23 @@ window.__ModuleLoader__.load({
       'split': '拖动调整对话 / 输入框宽度',
       'auto': '自动适配',
       'autoHint': '按窗口尺寸自动选形态',
-      'dualDesktop': '桌面端开不了第二个窗口：请用浏览器打开 DSH Web GUI 后再点「双屏」。',
-      'dualBlocked': '副窗口被浏览器拦截了，请允许弹窗后重试。',
-      'dualScreenDenied': '没拿到第二块屏幕的位置，副窗口先开在主屏下方，请拖到 2 号屏。',
+      'dualDesktop': '当前环境不支持这个窗口模式。',
+      'dualBlocked': '弹窗被浏览器拦截了，请允许弹窗后重试。',
+      'dualScreenDenied': '没拿到第二块屏幕的位置，窗口先开在主屏下方，请拖到 2 号屏。',
       'm1': '① 默认形态',
       'm1Hint': '原生布局，不做任何改动',
       'm2': '② 右输左出',
       'm2Hint': '3840×1100：左侧对话，右侧整列输入框',
-      'm3': '双屏协同',
+      'm3': '协同模式',
       'm4': '③ 上下分栏',
       'm4Hint': '2560×2334：上半全部对话，下面 734 全部输入框',
-      'roleFlow': '主屏 · 只看流程',
-      'rolePrompt': '副屏 · 只输入',
+      'roleFlow': '流程模式',
+      'rolePrompt': '输入模式',
     };
     const EN = {
-      'title': 'Dual-screen layout',
+      'title': 'Window layout',
       'subtitle': 'Re-layout of the existing regions, no new panels',
-      'openPanel': 'Dual-screen layout',
+      'openPanel': 'Window layout',
       'control': 'Layout',
       'close': 'Close',
       'reset': 'Reset',
@@ -77,18 +77,18 @@ window.__ModuleLoader__.load({
       'split': 'Drag to resize conversation / input',
       'auto': 'Adaptive',
       'autoHint': 'Pick a form from the window size',
-      'dualDesktop': 'The desktop shell cannot open a second window. Use the DSH Web GUI in a browser, then press Dual.',
-      'dualBlocked': 'The browser blocked the second window. Allow popups and try again.',
-      'dualScreenDenied': 'Could not read the second screen; the input window opened below the current screen. Drag it to screen 2.',
+      'dualDesktop': 'This environment does not support that window mode.',
+      'dualBlocked': 'The browser blocked the popup. Allow popups and try again.',
+      'dualScreenDenied': 'Could not read the second screen; the window opened below the current screen. Drag it to screen 2.',
       'm1': '① Default',
       'm1Hint': 'Shipped layout, untouched',
       'm2': '② Output left, input right',
       'm2Hint': '3840×1100: conversation left, composer as a right column',
-      'm3': 'Dual screens',
+      'm3': 'Collaboration',
       'm4': '③ Stacked',
       'm4Hint': '2560×2334: conversation on top, 734px composer below',
-      'roleFlow': 'Main · process only',
-      'rolePrompt': 'Secondary · input only',
+      'roleFlow': 'Flow view',
+      'rolePrompt': 'Input view',
     };
 
     // ------------------------------------------------------------------- css
@@ -302,13 +302,13 @@ html[data-ds-mode="secondary"]:not([data-dsd-hero="1"]) [data-composer-card] > d
 }
 html[data-ds-mode="secondary"]:not([data-dsd-hero="1"]) [data-composer-card] [contenteditable] { min-height: 100%; }
 
-/* ========== dual-screen collaboration — flow keeps the process only ====== */
+/* ========== role views — flow keeps the process only ==================== */
 html[data-ds-mode="flow"] [data-composer-seat] { display: none; }
 html[data-ds-mode="flow"] [data-conversation-content] {
   --dsh-chat-content-width: max(420px, min(calc(100% - 96px), 1400px));
 }
 
-/* ========== dual-screen collaboration — prompt keeps only the composer === */
+/* ========== role views — prompt keeps only the composer ================ */
 /* slot anchors carry an inline display:contents, so the hide must be important */
 html[data-ds-mode="prompt"] [data-slot="conversation.session"] { display: none !important; }
 html[data-ds-mode="prompt"] [data-conversation-content] {
@@ -763,7 +763,7 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
 
     /**
      * Popup geometry before the screen-management permission resolves: the other
-     * screen is assumed below the current one, the common vertical dual-screen
+     * screen is assumed below the current one, the common vertical stacked
      * arrangement. getScreenDetails() corrects it when the user allows it.
      */
     function fallbackPromptBounds() {
@@ -783,8 +783,6 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
     // ------------------------------------------------------------- components
 
     function ModeList(props) {
-      // The dual-screen collaboration (the two-window form) is deliberately absent
-      // here: it is owned by the titlebar 双屏 button, which elects the role itself.
       const { t, prefs, mode, onPick, compact } = props;
       const rows = [
         { id: 'auto', index: '◇', title: t('auto'), hint: t('autoHint') },
@@ -1252,7 +1250,6 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
               const menuRight = Math.round(menuEl.getBoundingClientRect().right);
               if (menuRight > 0) root.style.setProperty('--dsd-menu-end', (menuRight + 6) + 'px');
             }
-            // the 双屏 plate needs the button's real width (the label is localized)
 
             if (sidebar > 0) root.style.setProperty('--dsd-sidebar-w', Math.round(sidebar) + 'px');
             const seatEl = document.querySelector('[data-composer-seat]');
