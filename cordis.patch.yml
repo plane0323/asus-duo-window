@@ -1,0 +1,4 @@
+# dsh-dualscreen bundle patch: inserts the adaptive-layout row.
+- insert:
+    - id: dsh-dualscreen
+      name: 'dsh-dualscreen'
