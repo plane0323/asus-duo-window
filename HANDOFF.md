@@ -1,3 +1,10 @@
+> **2026-11-18 21:55← v1.6.15 全屏不再收起左栏：**
+> - 上一版的自动收起只在 `role === 'flow'` 时判断，measure() 每帧都跑，任何触发 measure 的动作（全屏、还原、跨 1024 断点、stale role）都可能落进"收起"分支。
+> - 改成**只认形态切换**：`modeNow === 'flow' && role === 'flow'` 且上帧不在 flow（`api.flowWasIn` false→true）才收一次；退出 flow 时再展开一次，其余一概不碰。
+> - 另外补一条：`html[data-fullscreen]` 从无到有时（且不在 flow/prompt 形态），若侧栏是收起的就展开——宿主自己的规则是"窗口宽度低于 1024px 自动收起、跨断点丢弃手动展开覆盖"，从窄窗口进全屏正好会踩到，这条把它补回来。
+> - 实测：收起侧栏（内联 0px）→ 加 `data-fullscreen` → 内联回到 280px ✓；移除此属性保持 280px。
+> - 客户端改动，无需重启。
+
 > **2026-11-18 21:50← v1.6.14 附件把 @// 候选菜单顶到打字行上：**
 > - prompt 形态的候选菜单原来是 `top: 52px`（相对卡片顶固定）。一旦卡片顶部挂了图片/文件缩略图，编辑区被顶下去，52px 就正好压在输入的第一行上。
 > - 改成测量：`measure()` 里取 `[data-composer-seat] [contenteditable]` 相对卡片的 top，写进 `--dsd-menu-top = max(8, editorTop + 36)`，菜单 `top: var(--dsd-menu-top, 52px)`；`--dsd-menu-shift` 记录相对 52 的增量，从 max-height 里扣掉。

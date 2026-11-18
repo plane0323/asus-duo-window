@@ -2117,22 +2117,29 @@ html[data-ds-mode="flow"][data-dsd-rail="1"] [data-windows-menu] {
               if (button) { button.click(); return true; }
               return false;
             };
-            if (role.get() === 'flow') {
-              if (sidebar > 0 && !api.flowCollapsePending) {
-                api.flowCollapsePending = true;
-                api.flowCollapsedSidebar = toggleSidebar() === true;
-              }
-            } else {
-              if (api.flowCollapsePending) {
-                // Leaving the pair lets the next entry collapse again.
-                api.flowCollapsePending = false;
-              }
-              if (api.flowCollapsedSidebar && sidebar === 0) {
-                // ...and gives the sidebar back on the way out.
+            // Only the transition INTO the pair may touch the sidebar: an unrelated
+            // state (a fullscreen pass, a stale role, a resize) must never collapse
+            // it. Leaving the pair restores what we collapsed, once.
+            const modeNow = root.getAttribute('data-ds-mode') || 'none';
+            const inFlow = modeNow === 'flow' && role.get() === 'flow';
+            if (inFlow && !api.flowWasIn) {
+              api.flowWasIn = true;
+              if (sidebar > 0) api.flowCollapsedSidebar = toggleSidebar() === true;
+            } else if (!inFlow && api.flowWasIn) {
+              api.flowWasIn = false;
+              if (api.flowCollapsedSidebar) {
                 api.flowCollapsedSidebar = false;
-                toggleSidebar();
+                if (sidebar === 0) toggleSidebar();
               }
             }
+            // The shell drops its narrow-window sidebar override when the window
+            // crosses the 1024px breakpoint, so going fullscreen from a narrow
+            // window collapsed the sidebar. Put it back on the fullscreen edge.
+            const fullscreenNow = document.documentElement.hasAttribute('data-fullscreen');
+            if (fullscreenNow && !api.fullscreenPrev && modeNow !== 'flow' && modeNow !== 'prompt' && sidebar === 0) {
+              toggleSidebar();
+            }
+            api.fullscreenPrev = fullscreenNow;
 
             // the rail state drives the caption-corner plate
             const isRail = sidebar < 120;
