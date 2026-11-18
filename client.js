@@ -26,7 +26,6 @@ window.__ModuleLoader__.load({
     const PREF_KEY = 'dsh.dualscreen.prefs.v1';
     const ROLE_KEY = 'dsh.dualscreen.role';
     const STYLE_ID = NS + '/layout.css';
-    const BUS_NAME = 'dsh-dualscreen';
     // The stacked form reserves the physical height of the secondary screen's
     // strip for the composer. It is a PHYSICAL pixel count: the plugin converts it
     // with window.devicePixelRatio, because a 150% window reports 734 physical
@@ -50,9 +49,30 @@ window.__ModuleLoader__.load({
       'split': '拖动调整对话 / 输入框宽度',
       'auto': '自动适配',
       'autoHint': '按窗口尺寸自动选形态',
-      'dualDesktop': '当前环境不支持这个窗口模式。',
-      'dualBlocked': '弹窗被浏览器拦截了，请允许弹窗后重试。',
-      'dualScreenDenied': '没拿到第二块屏幕的位置，窗口先开在主屏下方，请拖到 2 号屏。',
+      'titleBtn': '双屏',
+      'titleBtnOn': '关闭双屏协同',
+      'titleBtnOff': '开启双屏协同：主屏看过程，副屏只输入',
+      'dualWindow': '双屏协同',
+      'dualWindowOpen': '打开副屏输入窗',
+      'dualWindowClose': '关闭副屏输入窗',
+      'dualWindowHint': '主窗只看对话，副屏只留侧栏和输入框；关掉副屏即结束',
+      'screens': '屏幕',
+      'screen': '屏幕',
+      'screensHint': '点「双屏」时两个窗口自动最大化到选中的屏幕',
+      'mainScreen': '主窗屏幕',
+      'promptScreen': '输入窗屏幕',
+      'screenAuto': '自动（主屏 / 另一块屏）',
+      'screenLoading': '正在读取屏幕…',
+      'screenUnavailable': '读不到屏幕列表（只在桌面窗口里可用）',
+      'screenPrimary': '主屏',
+      'peakTitle': '峰时段发送',
+      'peakPrefix': '现在是',
+      'peakWord': '峰',
+      'peakSuffix': '时段，距离下一个谷时段还有 ',
+      'peakCancel': '取消',
+      'peakSend': '发送',
+      'dualWindowOpened': '已打开副屏输入窗',
+      'dualWindowFailed': '副屏输入窗打开失败',
       'm1': '① 默认形态',
       'm1Hint': '原生布局，不做任何改动',
       'm2': '② 右输左出',
@@ -77,9 +97,30 @@ window.__ModuleLoader__.load({
       'split': 'Drag to resize conversation / input',
       'auto': 'Adaptive',
       'autoHint': 'Pick a form from the window size',
-      'dualDesktop': 'This environment does not support that window mode.',
-      'dualBlocked': 'The browser blocked the popup. Allow popups and try again.',
-      'dualScreenDenied': 'Could not read the second screen; the window opened below the current screen. Drag it to screen 2.',
+      'titleBtn': 'Dual',
+      'titleBtnOn': 'Turn the dual-screen pair off',
+      'titleBtnOff': 'Turn the dual-screen pair on: the main window watches, the other one types',
+      'dualWindow': 'Dual screen',
+      'dualWindowOpen': 'Open the input window',
+      'dualWindowClose': 'Close the input window',
+      'dualWindowHint': 'The main window keeps the conversation; the other screen keeps the sidebar and the composer',
+      'screens': 'Screens',
+      'screen': 'Screen',
+      'screensHint': 'The pair opens maximized on these screens',
+      'mainScreen': 'Main window screen',
+      'promptScreen': 'Input window screen',
+      'screenAuto': 'Auto (primary / the other screen)',
+      'screenLoading': 'Reading screens…',
+      'screenUnavailable': 'No screen list in this window',
+      'screenPrimary': 'primary',
+      'peakTitle': 'Peak-hour send',
+      'peakPrefix': 'It is now ',
+      'peakWord': 'peak',
+      'peakSuffix': ' hours — the next off-peak window starts in ',
+      'peakCancel': 'Cancel',
+      'peakSend': 'Send',
+      'dualWindowOpened': 'Input window opened',
+      'dualWindowFailed': 'Could not open the input window',
       'm1': '① Default',
       'm1Hint': 'Shipped layout, untouched',
       'm2': '② Output left, input right',
@@ -302,24 +343,135 @@ html[data-ds-mode="secondary"]:not([data-dsd-hero="1"]) [data-composer-card] > d
 }
 html[data-ds-mode="secondary"]:not([data-dsd-hero="1"]) [data-composer-card] [contenteditable] { min-height: 100%; }
 
-/* ========== role views — flow keeps the process only ==================== */
-html[data-ds-mode="flow"] [data-composer-seat] { display: none; }
+/* ========== the pair — the context side keeps the conversation ========== */
+/* One real DSH window per side. The context side drops the left sidebar and
+   the composer; the conversation takes the freed width and the shipped right
+   sidebar keeps its own track. Nothing is cloned, nothing is redrawn. */
+html[data-ds-mode="flow"] [data-composer-seat] { display: none !important; }
 html[data-ds-mode="flow"] [data-conversation-content] {
   --dsh-chat-content-width: max(420px, min(calc(100% - 96px), 1400px));
 }
+/* The shell writes the three tracks as an inline pixel template, so the whole
+   template has to be restated to collapse the sidebar. The third track mirrors
+   the shipped right-sidebar width, read back from that inline template by
+   measure(); a closed panel is 0px and keeps the conversation edge to edge. */
+html[data-ds-mode="flow"] [data-slot="root"] > * {
+  grid-template-columns: var(--dsd-flow-tracks, 0 minmax(0px, 1fr) minmax(0px, 0px)) !important;
+}
+html[data-ds-mode="flow"] [data-slot="root"] > * > :first-child { display: none !important; }
+/* Position alone is not a contract: hide the column by the slot it holds too, so
+   an expanded sidebar can never keep painting over the transcript. */
+html[data-ds-mode="flow"] [data-slot="root"] > * > :has([data-slot="sidebar"]) { display: none !important; }
+/* The centre column rounds its top-left corner against the sidebar seam. With
+   the sidebar gone that round corner is a stray notch over the frame. */
+html[data-ds-mode="flow"] [data-slot="root"] > * > :nth-child(2) {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+/* the sidebar resize handle would leave an invisible 8px strip over the transcript */
+html[data-ds-mode="flow"] [data-slot="root"] > * > [data-side="sidebar"] { display: none !important; }
+html[data-ds-mode="flow"] [data-width-handle] { display: none !important; }
 
-/* ========== role views — prompt keeps only the composer ================ */
-/* slot anchors carry an inline display:contents, so the hide must be important */
-html[data-ds-mode="prompt"] [data-slot="conversation.session"] { display: none !important; }
+/* ========== the pair — the input side keeps sidebar and composer ======== */
+/* The conversation header would make this window a second, half-empty reader;
+   this side only types. The tabs, the title row and the transcript go, and the
+   composer seat that lives in the same scroller is the only survivor. */
+html[data-ds-mode="prompt"] [data-slot="conversation.header"] { display: none !important; }
+html[data-ds-mode="prompt"] [data-conversation-tabs] { display: none !important; }
+html[data-ds-mode="prompt"] [data-conversation-scroll] > *:not([data-composer-seat]):not(:has([data-composer-seat])) {
+  display: none !important;
+}
+html[data-ds-mode="prompt"] [data-conversation-scroll] { overflow: hidden; }
+/* The right panel belongs to the context side; this side never widens for it,
+   and its own sidebar track still follows the shipped (resizable) width. */
+html[data-ds-mode="prompt"] [data-slot="root"] > * {
+  grid-template-columns: var(--dsd-sidebar-w, 280px) minmax(0, 1fr) 0 !important;
+}
+html[data-ds-mode="prompt"] [data-rightbar-col] { display: none !important; }
+/* A blank session paints the hero headline and its workspace row above the
+   composer; both are siblings of the input bar inside the seat, and the bar is
+   the only one holding an editor, so keep exactly that one. */
+html[data-ds-mode="prompt"] [data-conversation-content][data-content-phase="hero"] [data-composer-seat] > * > *:not(:has([contenteditable])) {
+  display: none !important;
+}
+/* The blank-session composer stack also carries the hero headline and its
+   workspace row; together with the full-height card they pushed it off screen. */
+html[data-ds-mode="prompt"] [data-conversation-content][data-content-phase="hero"] [data-composer-seat] [class*="composerStack"] > *:not(:has([contenteditable])) {
+  display: none !important;
+}
 html[data-ds-mode="prompt"] [data-conversation-content] {
   --dsh-chat-content-width: max(420px, min(calc(100% - 160px), 1600px));
   --dsh-composer-card-max-width: max(420px, min(calc(100% - 160px), 1680px));
 }
+/* The prompt card now fills the pane, so the shipped menu (anchored above the
+   card, clamped to the gap above it) would be a sliver. Drop it over the card's
+   top edge instead: the card is a big empty typing surface, and the list keeps
+   the card's width. */
+html[data-ds-mode="prompt"] [data-trigger-menu] {
+  /* Under the first text line, measured: an attachment row pushes that line down
+     and a fixed offset would sit on top of the typed '@'. */
+  top: var(--dsd-menu-top, 52px) !important;
+  bottom: auto !important;
+  left: 8px !important;
+  right: 8px !important;
+  /* The card now spans the band, so the candidate list can too: everything
+     under the first editor line, down to the toolbar. */
+  max-height: clamp(140px, calc(100dvh - 2 * var(--dsd-vgap, 72px) - 96px - var(--dsd-menu-shift, 0px)), 70vh) !important;
+}
+
 html[data-ds-mode="prompt"] [data-composer-seat] {
   margin-top: auto;
   margin-bottom: auto;
   background: none !important;
-  --dsh-composer-text-max-height: min(54vh, 600px);
+  --dsh-composer-text-max-height: min(46vh, 520px);
+  /* This window is the typing surface: the card grows until the white space
+     above and below it equals the side gutters (--dsd-composer-gap is measured). */
+  height: calc(100% - 2 * var(--dsd-vgap, 72px));
+  min-height: 128px;
+}
+html[data-ds-mode="prompt"] { --dsd-vgap: min(var(--dsd-composer-gap, 96px), 72px); }
+html[data-ds-mode="prompt"] [data-composer-seat] :has(> [data-composer-card]) { flex: 1 1 auto; min-height: 0; height: 100%; }
+html[data-ds-mode="prompt"] [data-composer-seat] [data-composer-card] {
+  flex: 1 1 auto;
+  min-height: calc(100dvh - 2 * var(--dsd-vgap, 72px) - 30px);
+  /* A long draft scrolls inside the card; its borders never leave the screen. */
+  max-height: calc(100dvh - 2 * var(--dsd-vgap, 72px));
+  overflow: hidden;
+}
+html[data-ds-mode="prompt"] [data-composer-seat] [data-composer-card] > div:has([contenteditable]) {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+
+/* The @ / slash candidate menu is owned by the composer card: it opens above
+   the card, clamped to the space above it. In the left/right form the card is
+   the whole right column and starts at the top of the window, so that menu
+   collapses to a sliver. Float it over the conversation pane instead, where the
+   list has the reading width it was designed for. */
+/* The seat carries will-change: transform, so it — not the viewport — is the
+   containing block of a fixed descendant. offsetLeft is the seat's left edge
+   (--dsd-divider-x) and the seat fills the panel column, so these two insets
+   put the menu edge to edge across the conversation pane, clear of the
+   composer column on the right. */
+html[data-ds-mode="secondary"] [data-trigger-menu] {
+  position: fixed !important;
+  left: calc(-1 * (var(--dsd-divider-x, 0px) - var(--dsd-sidebar-w, 280px) - 20px)) !important;
+  right: calc(var(--dsd-panel-eff, 340px) + 20px) !important;
+  bottom: 20px !important;
+  width: auto !important;
+  min-width: 240px !important;
+  max-height: min(420px, calc(100dvh - 120px)) !important;
+  z-index: 60 !important;
+}
+
+/* The stacked form's transcript is the upper (main) screen. The shipped menu
+   is bottom-anchored 4px above the composer card, which lands a few dozen
+   physical pixels inside the composer band; lift it clear so the whole list
+   stays above the 1600px line. */
+html[data-ds-mode="span"] [data-trigger-menu] {
+  bottom: calc(100% + 32px) !important;
 }
 
 /* ========== form ③ 2560×2334 — conversation above, composer below ======= */
@@ -409,7 +561,6 @@ html[data-ds-mode="span"] [data-composer-card] [contenteditable] { min-height: 1
 .dsd-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
 [data-shell-overlay] .dsd-overlay { pointer-events: none; }
 .dsd-overlay .dsd-split,
-.dsd-overlay .dsd-pill,
 .dsd-overlay .dsd-scrim { pointer-events: auto; }
 
 /* The transcript now occupies the caption band, so the shell's own drag surface
@@ -445,6 +596,51 @@ html[data-ds-mode="span"] [data-composer-card] [contenteditable] { min-height: 1
   pointer-events: none;
   z-index: 1;
 }
+/* Caption plate for the 双屏 button. Left/right form has a transparent band
+   over the transcript, so the button needs the same plate as the corner
+   buttons and the menubar; it also covers the 6px gap after the menubar. */
+.dsd-titleplate {
+  position: fixed;
+  top: 0;
+  left: calc(var(--dsd-menu-end, 222px) - 6px);
+  width: calc(var(--dsd-titlebtn-w, 46px) + 6px);
+  height: var(--dsd-band, 0px);
+  background: var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-layer-1, #1b1b1c));
+  border-right: var(--dsd-hair) solid var(--dsd-rule-soft);
+  border-bottom: var(--dsd-hair) solid var(--dsd-rule-soft);
+  border-bottom-right-radius: 10px;
+  pointer-events: none;
+  z-index: 1;
+}
+/* Titlebar quick toggle, to the right of the desktop menubar (应用 / 编辑).
+   That menubar is page DOM injected by the preload; this button is plugin
+   chrome pinned into the same caption band. */
+.dsd-titlebtn {
+  position: fixed;
+  top: 6px;
+  left: var(--dsd-menu-end, 222px);
+  z-index: 12;
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 28px; padding: 0 10px;
+  border: 0; border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary, inherit);
+  font-size: 13px; line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  transition: background .16s var(--dsd-ease), color .16s var(--dsd-ease), transform .12s var(--dsd-ease);
+}
+.dsd-titlebtn:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.dsd-titlebtn:active { transform: scale(.97); }
+.dsd-titlebtn[data-on="1"] {
+  color: var(--dsw-alias-brand-primary, #4d6bfe);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #4d6bfe) 12%, transparent);
+}
+/* the menubar only exists in the desktop window; the web GUI has no 应用/编辑 */
+html:not([data-dsd-menu="1"]) .dsd-titlebtn { display: none; }
+
 /* only while the sidebar is a collapsed rail does the menubar float over the
    transcript and need an opaque plate of its own */
 html[data-ds-mode][data-dsd-rail="1"] [data-windows-menu] {
@@ -457,6 +653,14 @@ html[data-ds-mode][data-dsd-rail="1"] [data-windows-menu] {
 /* The stacked form shows the conversation header right below the band, so the
    band no longer floats over scrolling content: drop the caption plates there. */
 html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
+  background: transparent;
+  padding: 0;
+  border: 0;
+  border-bottom-right-radius: 0;
+}
+/* The pair hides the sidebar entirely, so the menubar plate has no rail to sit
+   on: its L-shaped border and rounded corner became a stray notch. */
+html[data-ds-mode="flow"][data-dsd-rail="1"] [data-windows-menu] {
   background: transparent;
   padding: 0;
   border: 0;
@@ -484,6 +688,38 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
 
 
 
+.dsd-peak { color: #ff5c5c; }
+.dsd-valley { color: #39c56f; }
+.dsd-confirm-scrim {
+  position: fixed; inset: 0;
+  z-index: 80;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; box-sizing: border-box;
+  background: var(--dsw-alias-bg-mask-1, rgba(0,0,0,.32));
+  backdrop-filter: blur(6px);
+}
+.dsd-confirm {
+  width: min(420px, 100%);
+  display: flex; flex-direction: column;
+  border: var(--dsd-hair) solid var(--dsd-rule);
+  border-radius: 18px;
+  background: #2c2c2e;
+  box-shadow: 0 24px 60px rgba(0,0,0,.35);
+  overflow: hidden;
+}
+.dsd-confirm-text { font-size: 12.5px; line-height: 1.75; color: var(--dsw-alias-label-secondary, inherit); }
+.dsd-peak-big { color: #ff5c5c; font-size: 15px; font-weight: 700; padding: 0 1px; }
+.dsd-confirm-countdown { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--dsw-alias-label-primary, inherit); }
+.dsd-btn-primary {
+  background: #2f6fed;
+  border-color: transparent;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 7px 18px;
+}
+.dsd-btn-primary:hover { background: #3b7bf5; }
+
 /* One-shot notice for the dual-window entry (desktop shell / blocked popup). */
 .dsd-toast {
   position: fixed;
@@ -506,25 +742,6 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
   transition: opacity .18s var(--dsd-ease), transform .18s var(--dsd-ease);
 }
 .dsd-toast[data-show="1"] { opacity: 1; transform: translate(-50%, 0); }
-
-.dsd-pill {
-  position: absolute;
-  bottom: 14px;
-  right: 14px;
-  display: flex; align-items: center; gap: 6px;
-  padding: 4px 6px 4px 10px;
-  border: var(--dsd-hair) solid var(--dsd-rule);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #fff) 90%, transparent);
-  backdrop-filter: blur(16px) saturate(1.2);
-  box-shadow: var(--dsw-elevation-soft, 0 6px 20px rgba(0,0,0,.08));
-  opacity: .58;
-  transition: opacity .18s var(--dsd-ease), transform .18s var(--dsd-ease);
-}
-.dsd-pill[data-side="left"] { left: 300px; right: auto; }
-.dsd-pill:hover, .dsd-pill:focus-within { opacity: 1; }
-@starting-style { .dsd-pill { opacity: 0; transform: translateY(6px); } }
-.dsd-pill-name { font-size: 11.5px; letter-spacing: .02em; white-space: nowrap; }
 
 .dsd-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -613,6 +830,21 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
 .dsd-kv dd { margin: 0; font-variant-numeric: tabular-nums; }
 
 .dsd-settings { display: flex; flex-direction: column; gap: 12px; padding: 2px 0 12px; }
+.dsd-screens { display: flex; flex-wrap: wrap; gap: 14px; }
+.dsd-screen { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.dsd-screen-label { color: var(--dsw-alias-label-secondary, inherit); opacity: .85; }
+.dsd-select {
+  appearance: auto;
+  max-width: 320px;
+  padding: 4px 8px;
+  border: var(--dsd-hair) solid var(--dsd-rule);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1, transparent);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
 .dsd-settings-block {
   border: var(--dsd-hair) solid var(--dsd-rule-soft);
   border-radius: 14px; padding: 12px 14px;
@@ -623,7 +855,7 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
 @media (prefers-reduced-motion: reduce) {
   html[data-ds-mode][data-dsd-animate="on"]::view-transition-old(root),
   html[data-ds-mode][data-dsd-animate="on"]::view-transition-new(root) { animation: none; }
-  .dsd-pill, .dsd-scrim, .dsd-palette, .dsd-btn, .dsd-toast { transition: none; animation: none; }
+  .dsd-scrim, .dsd-palette, .dsd-btn, .dsd-toast { transition: none; animation: none; }
   html[data-ds-mode="secondary"]:not([data-dsd-hero="1"]) [data-composer-seat],
   html[data-ds-mode="secondary"]:not([data-dsd-hero="1"]) [data-conversation-scroll],
   html[data-ds-mode="span"] [data-composer-seat] { transition: none; }
@@ -660,7 +892,14 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
       let stored = {};
       try { stored = JSON.parse(window.localStorage.getItem(PREF_KEY) || '{}') || {}; } catch { stored = {}; }
       const mode = ['auto', 'default', 'secondary', 'dual', 'span'].indexOf(stored.mode) === -1 ? 'auto' : stored.mode;
-      const store = createStore({ mode, split: Number.isFinite(stored.split) ? stored.split : 0.26 });
+      const mainDisplay = typeof stored.mainDisplay === 'string' ? stored.mainDisplay : '';
+      const promptDisplay = typeof stored.promptDisplay === 'string' ? stored.promptDisplay : '';
+      const store = createStore({
+        mode,
+        split: Number.isFinite(stored.split) ? stored.split : 0.26,
+        mainDisplay,
+        promptDisplay,
+      });
       store.persist = () => {
         try { window.localStorage.setItem(PREF_KEY, JSON.stringify(store.get())); } catch { /* private mode */ }
       };
@@ -671,11 +910,18 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
     function readRole() {
       try {
         const direct = new URLSearchParams(window.location.search).get('dshds');
-        if (direct === 'prompt' || direct === 'flow') return direct;
+        if (direct === 'prompt') {
+          // The prompt window drops its query when the sidebar navigates; keep
+          // the prompt role across that reload only. `flow` is deliberately not
+          // persisted: a stale flow role made the main window start up with its
+          // sidebar and composer hidden, which reads as a blank window.
+          try { window.sessionStorage.setItem(ROLE_KEY, 'prompt'); } catch { /* private mode */ }
+          return 'prompt';
+        }
       } catch { /* no location */ }
       try {
         const raw = window.sessionStorage.getItem(ROLE_KEY);
-        if (raw === 'prompt' || raw === 'flow') return raw;
+        if (raw === 'prompt') return 'prompt';
       } catch { /* private mode */ }
       return null;
     }
@@ -703,10 +949,16 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
       const h = window.innerHeight;
       if (!w || !h) return 'default';
       const ratio = w / h;
-      // Aspect ratio only — a scaled panel (150%/200% DPI) reports far fewer CSS
-      // pixels than its physical resolution, so absolute sizes must not gate this.
+      // The stacked form exists for a window that spans the Duo's two screens.
+      // The main screen is 1600 PHYSICAL pixels tall, but a maximized window
+      // already measures 1599, so the threshold sits well above it: only a
+      // window that really reaches onto the secondary strip qualifies.
+      const physicalHeight = h * (window.devicePixelRatio || 1);
+      if (physicalHeight > 2000) return 'span';
+      // Aspect ratio only for the left/right form — a scaled panel (150%/200%
+      // DPI) reports far fewer CSS pixels than its physical resolution, so
+      // absolute sizes must not gate this one.
       if (ratio >= 2.2) return 'secondary';       // wide and short: output left / input right
-      if (ratio >= 0.85 && ratio <= 1.18) return 'span'; // tall and squarish: stacked
       return 'default';
     }
 
@@ -761,23 +1013,204 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
       toastTimer = window.setTimeout(() => { node.setAttribute('data-show', '0'); }, 5200);
     }
 
-    /**
-     * Popup geometry before the screen-management permission resolves: the other
-     * screen is assumed below the current one, the common vertical stacked
-     * arrangement. getScreenDetails() corrects it when the user allows it.
-     */
-    function fallbackPromptBounds() {
-      const s = window.screen || {};
-      const left = Number.isFinite(s.availLeft) ? s.availLeft : 0;
-      const top = Number.isFinite(s.availTop) ? s.availTop : 0;
-      const width = Number.isFinite(s.availWidth) ? s.availWidth : 1280;
-      const height = Number.isFinite(s.availHeight) ? s.availHeight : 800;
-      return {
-        left: Math.round(left),
-        top: Math.round(top + height),
-        width: Math.max(720, Math.round(width)),
-        height: Math.max(480, Math.round(Math.min(900, height))),
+    // ---------------------------------------------------- peak / valley send
+    // Off-peak price is half the peak price. Peak hours are Beijing time,
+    // Monday–Friday, 09:00–12:00 and 14:00–18:00, excluding Chinese statutory
+    // holidays; everything else — weekends and holidays included — is off-peak.
+    const BEIJING_OFFSET = 8 * 3600 * 1000;
+    const PEAK_ACK_KEY = 'dsh.dualscreen.peak-ack';
+    // State Council holiday notices: 2026 = 国办发明电〔2025〕7号,
+    // 2027 = 国办发明电〔2026〕10号. Add the next year's notice here.
+    const CN_HOLIDAYS = new Set([
+      // 2026
+      '2026-01-01', '2026-01-02', '2026-01-03',
+      '2026-02-15', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-21', '2026-02-22', '2026-02-23',
+      '2026-04-04', '2026-04-05', '2026-04-06',
+      '2026-05-01', '2026-05-02', '2026-05-03', '2026-05-04', '2026-05-05',
+      '2026-06-19', '2026-06-20', '2026-06-21',
+      '2026-09-25', '2026-09-26', '2026-09-27',
+      '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07',
+      // 2027
+      '2027-01-01', '2027-01-02', '2027-01-03',
+      '2027-02-05', '2027-02-06', '2027-02-07', '2027-02-08', '2027-02-09', '2027-02-10', '2027-02-11', '2027-02-12', '2027-02-13',
+      '2027-04-03', '2027-04-04', '2027-04-05',
+      '2027-05-01', '2027-05-02', '2027-05-03', '2027-05-04', '2027-05-05',
+      '2027-06-09',
+      '2027-09-15',
+      '2027-10-01', '2027-10-02', '2027-10-03', '2027-10-04', '2027-10-05', '2027-10-06', '2027-10-07',
+    ]);
+
+    function beijingDate(now) {
+      return new Date((now || Date.now()) + BEIJING_OFFSET);
+    }
+
+    function beijingKey(now) {
+      const bj = beijingDate(now);
+      const month = String(bj.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(bj.getUTCDate()).padStart(2, '0');
+      return bj.getUTCFullYear() + '-' + month + '-' + day;
+    }
+
+    function isPeakTime(now) {
+      const bj = beijingDate(now);
+      const weekday = bj.getUTCDay();
+      if (weekday === 0 || weekday === 6) return false;
+      if (CN_HOLIDAYS.has(beijingKey(now))) return false;
+      const minutes = bj.getUTCHours() * 60 + bj.getUTCMinutes();
+      return (minutes >= 540 && minutes < 720) || (minutes >= 840 && minutes < 1080);
+    }
+
+    function isValleyTime(now) {
+      return !isPeakTime(now);
+    }
+
+    /** End of the current peak window (only meaningful while it is peak). */
+    function nextValleyAt(now) {
+      const stamp = now || Date.now();
+      const bj = beijingDate(stamp);
+      const minutes = bj.getUTCHours() * 60 + bj.getUTCMinutes();
+      const end = minutes < 720 ? 720 : 1080;
+      const midnightUtc = Date.UTC(bj.getUTCFullYear(), bj.getUTCMonth(), bj.getUTCDate());
+      return midnightUtc + end * 60000 - BEIJING_OFFSET;
+    }
+
+    function formatCountdown(ms) {
+      const total = Math.max(0, Math.floor(ms / 1000));
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const seconds = total % 60;
+      return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+    }
+
+    /** The composer's round primary button: the last visible button in the card. */
+    function primarySendButton() {
+      const card = document.querySelector('[data-composer-card]');
+      if (!card) return null;
+      const buttons = card.querySelectorAll('button');
+      for (let i = buttons.length - 1; i >= 0; i -= 1) {
+        const box = buttons[i].getBoundingClientRect();
+        if (box.width > 0 && box.height > 0) return buttons[i];
+      }
+      return null;
+    }
+
+    /** While a turn runs the same button stops it, and stop draws a square. */
+    function isSendAction(button) {
+      if (!button) return false;
+      const svg = button.querySelector('svg');
+      if (!svg) return false;
+      return svg.querySelector('rect') === null;
+    }
+
+    function peakAcknowledged() {
+      try { return window.sessionStorage.getItem(PEAK_ACK_KEY) === '1'; } catch { return false; }
+    }
+
+    function acknowledgePeak() {
+      try { window.sessionStorage.setItem(PEAK_ACK_KEY, '1'); } catch { /* private mode */ }
+    }
+
+    /** Append （峰）/（谷） to the shipped send tooltip, coloured by the period. */
+    function decorateSendTooltip(tooltip) {
+      const button = primarySendButton();
+      if (!button || !isSendAction(button)) return;
+      const label = button.getAttribute('aria-label') || '';
+      if (!label || (tooltip.textContent || '').trim() !== label) return;
+      const valley = isValleyTime();
+      if (tooltip.getAttribute('data-dsd-period') === (valley ? 'valley' : 'peak')) return;
+      tooltip.setAttribute('data-dsd-period', valley ? 'valley' : 'peak');
+      tooltip.textContent = '';
+      tooltip.appendChild(document.createTextNode(label + '（'));
+      const mark = document.createElement('span');
+      mark.className = valley ? 'dsd-valley' : 'dsd-peak';
+      mark.textContent = valley ? '谷' : '峰';
+      tooltip.appendChild(mark);
+      tooltip.appendChild(document.createTextNode('）'));
+    }
+
+    /** Modal second confirmation for the first peak-time send of this launch. */
+    function openPeakConfirm(t, onConfirm, onCancel) {
+      if (!document.body || document.querySelector('[data-dsd-confirm]')) return null;
+      const scrim = document.createElement('div');
+      scrim.className = 'dsd-confirm-scrim dsd-ui';
+      scrim.setAttribute('data-dsd-confirm', '');
+      const box = document.createElement('div');
+      box.className = 'dsd-confirm dsd-ui';
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-modal', 'true');
+      box.setAttribute('aria-labelledby', 'dsd-confirm-title');
+      const head = document.createElement('div');
+      head.className = 'dsd-palette-head';
+      const titles = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'dsd-palette-title';
+      title.id = 'dsd-confirm-title';
+      title.textContent = t('peakTitle');
+      titles.appendChild(title);
+      head.appendChild(titles);
+      const body = document.createElement('div');
+      body.className = 'dsd-palette-body';
+      const copy = document.createElement('div');
+      copy.className = 'dsd-confirm-text';
+      copy.appendChild(document.createTextNode(t('peakPrefix')));
+      const peakMark = document.createElement('span');
+      peakMark.className = 'dsd-peak-big';
+      peakMark.textContent = t('peakWord');
+      copy.appendChild(peakMark);
+      copy.appendChild(document.createTextNode(t('peakSuffix')));
+      const countdown = document.createElement('span');
+      countdown.className = 'dsd-confirm-countdown';
+      copy.appendChild(countdown);
+      body.appendChild(copy);
+      // Live countdown to the next off-peak window, refreshed every second.
+      const tick = () => { countdown.textContent = formatCountdown(nextValleyAt() - Date.now()); };
+      tick();
+      const timer = window.setInterval(tick, 1000);
+      const foot = document.createElement('div');
+      foot.className = 'dsd-palette-foot';
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'dsd-btn dsd-btn-ghost';
+      cancel.textContent = t('peakCancel');
+      const go = document.createElement('button');
+      go.type = 'button';
+      go.className = 'dsd-btn dsd-btn-primary';
+      go.textContent = t('peakSend');
+      foot.appendChild(cancel);
+      foot.appendChild(go);
+      box.appendChild(head);
+      box.appendChild(body);
+      box.appendChild(foot);
+      scrim.appendChild(box);
+      document.body.appendChild(scrim);
+
+      let done = false;
+      const close = () => {
+        if (scrim.parentNode) scrim.parentNode.removeChild(scrim);
+        window.clearInterval(timer);
+        document.removeEventListener('keydown', onKey, true);
       };
+      const finish = (confirmed) => {
+        if (done) return;
+        done = true;
+        close();
+        if (confirmed) { if (onConfirm) onConfirm(); } else if (onCancel) onCancel();
+      };
+      const onKey = (ev) => {
+        if (ev.key === 'Escape') {
+          ev.preventDefault();
+          ev.stopPropagation();
+          finish(false);
+        }
+      };
+      cancel.addEventListener('click', (ev) => { ev.stopPropagation(); finish(false); });
+      go.addEventListener('click', (ev) => { ev.stopPropagation(); finish(true); });
+      scrim.addEventListener('click', (ev) => { if (ev.target === scrim) finish(false); });
+      document.addEventListener('keydown', onKey, true);
+      // Enter is the send key in the composer: default the focus to Cancel so a
+      // stray Enter dismisses the prompt instead of sending.
+      try { cancel.focus(); } catch { /* not focusable */ }
+      return () => finish(false);
     }
 
     // ------------------------------------------------------------- components
@@ -846,12 +1279,27 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
             h('span', { className: 'dsd-hint' }, labelMode(mode, t)))));
     }
 
-    function Pill(props) {
-      const { t, mode, onOpen, onReset } = props;
-      return h('div', { className: 'dsd-pill dsd-ui', 'data-side': 'right' },
-        h('span', { className: 'dsd-pill-name' }, labelMode(mode, t)),
-        h('button', { type: 'button', className: 'dsd-btn', onClick: onOpen }, t('control')),
-        h('button', { type: 'button', className: 'dsd-btn dsd-btn-ghost', onClick: onReset }, t('exit')));
+    function TitleButton(props) {
+      // One-click pair: this window becomes the context side and the Host opens
+      // the native prompt window on the other display.
+      const { api, on } = props;
+      return h('button', {
+        type: 'button',
+        className: 'dsd-titlebtn dsd-ui',
+        'data-on': on ? '1' : '0',
+        'aria-pressed': on,
+        'aria-label': api.t('titleBtn'),
+        title: on ? api.t('titleBtnOn') : api.t('titleBtnOff'),
+        onClick: () => {
+          if (on) api.resetDual();
+          else void api.openDualWindow();
+        },
+      }, api.t('titleBtn'));
+    }
+
+    function TitlePlate() {
+      // Caption occluder for the 双屏 button; covers the 6px gap after the menubar.
+      return h('div', { className: 'dsd-titleplate', 'aria-hidden': 'true' });
     }
 
     function SettingsSection(props) {
@@ -861,6 +1309,35 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
       const ui = useStore(api.ui);
       const mode = ui.mode || resolveMode(prefs, role);
       const size = api.size();
+      const dualActive = prefs.mode === 'dual' || role === 'flow' || role === 'prompt';
+      const toggleDual = () => {
+        if (dualActive) api.resetDual();
+        else void api.openDualWindow();
+      };
+      // Screen list comes from the Host (PowerShell enumerates the real displays,
+      // physical pixels); the choices are stored by device name.
+      const [displays, setDisplays] = useState(null);
+      useEffect(() => {
+        let alive = true;
+        api.listDisplays().then((list) => { if (alive) setDisplays(list); }).catch(() => { if (alive) setDisplays([]); });
+        return () => { alive = false; };
+      }, [api]);
+      const screenLabel = (display, index) => api.t('screen') + ' ' + (index + 1) + ' · '
+        + display.width + '×' + display.height
+        + (display.primary ? ' · ' + api.t('screenPrimary') : '');
+      const screenSelect = (field, labelKey) => h('label', { className: 'dsd-screen', key: field },
+        h('span', { className: 'dsd-screen-label' }, api.t(labelKey)),
+        h('select', {
+          className: 'dsd-select',
+          value: prefs[field] || '',
+          onChange: (ev) => api.patchPrefs({ [field]: ev.target.value }),
+        },
+          h('option', { value: '' }, api.t('screenAuto')),
+          (displays || []).map((display, index) => h('option', { value: display.device, key: display.device },
+            screenLabel(display, index)))));
+      const screenHint = displays === null
+        ? api.t('screenLoading')
+        : (displays.length ? api.t('screensHint') : api.t('screenUnavailable'));
       return h('div', { className: 'dsd-settings dsd-ui' },
         h('div', { className: 'dsd-settings-block' },
           h('div', { className: 'dsd-row' },
@@ -872,10 +1349,23 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
               api.patchPrefs({ mode: next });
               if (next !== 'dual') {
                 api.setRole(null);
-                api.closePromptWindow();
+                void api.closeDualWindow();
               }
             },
-          })));
+          })),
+        h('div', { className: 'dsd-settings-block' },
+          h('div', { className: 'dsd-row' },
+            h('div', { className: 'dsd-settings-title' }, api.t('dualWindow')),
+            h('button', { type: 'button', className: 'dsd-btn', onClick: toggleDual },
+              api.t(dualActive ? 'dualWindowClose' : 'dualWindowOpen'))),
+          h('span', { className: 'dsd-hint' }, api.t('dualWindowHint'))),
+        h('div', { className: 'dsd-settings-block' },
+          h('div', { className: 'dsd-row' },
+            h('div', { className: 'dsd-settings-title' }, api.t('screens')),
+            h('span', { className: 'dsd-hint' }, screenHint)),
+          h('div', { className: 'dsd-screens' },
+            screenSelect('mainDisplay', 'mainScreen'),
+            screenSelect('promptDisplay', 'promptScreen'))));
     }
 
     function DragStrip() {
@@ -904,7 +1394,7 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
           // absolute: the divider's left edge sits under the pointer, so there is
           // no accumulated delta to drift and the direction can never invert
           const panel = window.innerWidth - (api.rightbar || 0) - moveEv.clientX;
-          const clamped = Math.min(Math.max(panel, 340), 960);
+          const clamped = Math.min(Math.round(avail * 0.7), Math.max(300, panel));
           // Drive the layout directly as well: the drag must not depend on the
           // measurement pass landing in time, or it looks like nothing happens.
           document.documentElement.style.setProperty('--dsd-panel-eff', clamped + 'px');
@@ -946,7 +1436,7 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
         api.patchPrefs({ mode: next });
         if (next !== 'dual') {
           api.setRole(null);
-          api.closePromptWindow();
+          void api.closeDualWindow();
         }
       }, [api]);
       const onRole = useCallback((next) => api.setRole(next), [api]);
@@ -954,20 +1444,20 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
       const onReset = useCallback(() => api.resetDual(), [api]);
 
       const parts = [];
+      const dualActive = prefs.mode === 'dual' || role === 'flow' || role === 'prompt';
+      // The native input window has no titlebar switch; the main/context side does.
+      if (role !== 'prompt') parts.push(h(TitleButton, { key: 'title', api, on: dualActive }));
       if (mode === 'secondary' || mode === 'span') {
         parts.push(h(DragStrip, { key: 'drag' }));
         // The stacked form keeps the conversation header under the band, so its
         // caption no longer floats over the transcript and needs no plates.
         if (mode === 'secondary' && ui.rail) {
+          parts.push(h(TitlePlate, { key: 'titleplate' }));
           parts.push(h(CornerPlate, { key: 'corner' }));
         }
       }
       if (mode === 'secondary') {
         parts.push(h(SplitHandle, { key: 'split', t, api }));
-      } else if (mode === 'flow') {
-        // Only the context side keeps the floating pill (layout palette + exit);
-        // the input popup is clean, and the titlebar button is its off switch.
-        parts.push(h(Pill, { key: 'pill', t, mode, onOpen, onReset }));
       }
       if (ui.palette) {
         parts.push(h(Palette, {
@@ -999,101 +1489,420 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
           t,
           size: () => ({ w: window.innerWidth, h: window.innerHeight }),
           avail: 0,
-          promptWin: null,
-          promptWatch: 0,
-          busPost: null,
+          dualWatch: 0,
           patchPrefs: (patch) => prefs.patch(patch),
           setRole: (next) => role.setRole(next),
 
-          /** Open the input-side popup on the other display; null when unavailable. */
-          openPromptWindow: () => {
-            if (isDesktopShell()) {
-              showToast(t('dualDesktop'));
-              return null;
-            }
-            if (api.promptWin && !api.promptWin.closed) {
-              try { api.promptWin.focus(); } catch { /* closed */ }
-              return api.promptWin;
-            }
-            const url = new URL(window.location.href);
-            url.searchParams.set('dshds', 'prompt');
-            const bounds = fallbackPromptBounds();
-            const features = 'popup=yes,width=' + bounds.width + ',height=' + bounds.height
-              + ',left=' + bounds.left + ',top=' + bounds.top + ',resizable=yes,scrollbars=yes';
-            let win = null;
-            try { win = window.open(url.href, 'dsh-dualscreen-prompt', features); } catch { win = null; }
-            if (!win || win.closed) {
-              showToast(t('dualBlocked'));
-              return null;
-            }
-            api.promptWin = win;
-            // The popup opens synchronously (user gesture); once the screen-access
-            // permission settles, move it onto the display the current one is not on.
+          /** Screens the Host can see, for the two screen pickers. */
+          listDisplays: async () => {
             try {
-              if (typeof window.getScreenDetails === 'function') {
-                window.getScreenDetails().then((details) => {
-                  const target = (details.screens || []).find((screen) => screen !== details.currentScreen) || null;
-                  if (target === null || !api.promptWin || api.promptWin.closed) return;
-                  try {
-                    api.promptWin.moveTo(target.availLeft, target.availTop);
-                    api.promptWin.resizeTo(target.availWidth, target.availHeight);
-                  } catch { /* the browser refused the move */ }
-                }).catch(() => { showToast(t('dualScreenDenied')); });
-              }
-            } catch { /* Window Management API unavailable */ }
-            if (api.promptWatch) window.clearInterval(api.promptWatch);
-            api.promptWatch = window.setInterval(() => {
-              const open = api.promptWin;
-              if (!open || !open.closed) return;
-              window.clearInterval(api.promptWatch);
-              api.promptWatch = 0;
-              api.promptWin = null;
-              // Closing the input window ends the pair; the context window returns
-              // to the automatic form instead of staying as a composer-less shell.
-              if (role.get() === 'flow' && prefs.get().mode === 'dual') {
-                prefs.patch({ mode: 'auto' });
-                role.setRole(null);
-              }
-            }, 900);
-            return win;
+              const res = await fetch('/dsh-ds-window/displays', { cache: 'no-store' });
+              const body = await res.json().catch(() => ({}));
+              return Array.isArray(body.displays) ? body.displays : [];
+            } catch {
+              return [];
+            }
           },
 
-          /** Close the input popup and drop the flow role from this window. */
-          closePromptWindow: () => {
-            const win = api.promptWin;
-            api.promptWin = null;
-            if (api.promptWatch) {
-              window.clearInterval(api.promptWatch);
-              api.promptWatch = 0;
-            }
-            if (win && !win.closed) {
-              try { win.close(); } catch { /* already gone */ }
-            }
-            if (api.busPost) {
-              try { api.busPost({ type: 'dual-off' }); } catch { /* channel closed */ }
+          /** Session the conversation shows right now ('' before it mounts). */
+          currentSession: () => {
+            const content = document.querySelector('[data-conversation-content]');
+            return content ? (content.getAttribute('data-conversation-session') || '') : '';
+          },
+
+          /** Open the native input window on the other display; this side becomes the context side. */
+          openDualWindow: async () => {
+            if (!isDesktopShell()) {
+              showToast(t('dualWindowFailed'));
+              return false;
             }
             try {
+              const res = await fetch('/dsh-ds-window/open', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                // Seed the Host before the window boots: the input side reads this
+                // id on its first tick, so the blank session it boots with can
+                // never take the pair over.
+                body: JSON.stringify({
+                  session: api.currentSession(),
+                  mainDisplay: prefs.get().mainDisplay || '',
+                  promptDisplay: prefs.get().promptDisplay || '',
+                }),
+              });
+              const body = await res.json().catch(() => ({}));
+              if (!res.ok || body.ok !== true) throw new Error((body && body.error) || ('HTTP ' + res.status));
+            } catch {
+              showToast(t('dualWindowFailed'));
+              return false;
+            }
+            role.setRole('flow');
+            prefs.patch({ mode: 'dual' });
+            api.watchDualWindow();
+            showToast(t('dualWindowOpened'));
+            return true;
+          },
+
+          /** Watch the Host until the input window is gone, then leave the pair. */
+          watchDualWindow: () => {
+            if (api.dualWatch) { window.clearInterval(api.dualWatch); api.dualWatch = 0; }
+            // The event stream reports the close; polling is only the fallback
+            // for a Host whose stream is not up.
+            if (api.sseStatus) return;
+            api.dualWatch = window.setInterval(() => {
+              void (async () => {
+                try {
+                  const res = await fetch('/dsh-ds-window/status', { cache: 'no-store' });
+                  const body = await res.json().catch(() => ({}));
+                  if (body.open === true) return;
+                } catch { /* Host restarting: keep watching for one more beat */ }
+                window.clearInterval(api.dualWatch);
+                api.dualWatch = 0;
+                // Closing the input window ends the pair.
+                if (role.get() === 'flow') api.resetDual();
+              })();
+            }, 1400);
+          },
+
+          /** Ask the Host to close the native input window. */
+          closeDualWindow: async () => {
+            if (api.dualWatch) {
+              window.clearInterval(api.dualWatch);
+              api.dualWatch = 0;
+            }
+            if (!isDesktopShell()) return;
+            try {
+              await fetch('/dsh-ds-window/close', { method: 'POST' });
+            } catch { /* already gone */ }
+          },
+
+          /** Leave the pair from the context side and restore the normal layout. */
+          resetDual: () => {
+            if (api.dualWatch) {
+              window.clearInterval(api.dualWatch);
+              api.dualWatch = 0;
+            }
+            role.setRole(null);
+            prefs.patch({ mode: 'auto' });
+            void api.closeDualWindow();
+            try {
               const url = new URL(window.location.href);
-              if (url.searchParams.get('dshds') === 'flow') {
+              if (url.searchParams.get('dshds')) {
                 url.searchParams.delete('dshds');
                 window.history.replaceState(null, '', url.href);
               }
             } catch { /* no location */ }
           },
-
-          /** Stop dual collaboration from the context side. */
-          resetDual: () => {
-            api.closePromptWindow();
-            prefs.patch({ mode: 'auto' });
-            role.setRole(null);
-          },
         };
 
         ctx.effect(() => () => {
-          if (api.promptWatch) window.clearInterval(api.promptWatch);
-          api.promptWatch = 0;
-          api.promptWin = null;
-        }, NS + ': dual popup watch');
+          if (api.dualWatch) window.clearInterval(api.dualWatch);
+          api.dualWatch = 0;
+        }, NS + ': dual window watch');
+
+        // A reload (HMR, or the shell restarting) drops the in-memory role. When
+        // the pair is still up, the context side takes its role back instead of
+        // leaving a working input window bound to a normal main window.
+        ctx.effect(() => {
+          if (!isDesktopShell() || role.get()) return undefined;
+          let cancelled = false;
+          void (async () => {
+            // A Host restart can make the first check fail while the input window
+            // is still up; retry briefly before dropping the pair, otherwise one
+            // page reload during a restart leaves a half-broken pair behind.
+            let open = false;
+            for (let attempt = 0; attempt < 6 && !cancelled; attempt += 1) {
+              if (role.get()) return;
+              try {
+                const res = await fetch('/dsh-ds-window/status', { cache: 'no-store' });
+                const body = await res.json().catch(() => ({}));
+                if (body.open === true) { open = true; break; }
+              } catch { /* Host still starting */ }
+              if (attempt < 5) await new Promise((resolve) => { window.setTimeout(resolve, 400); });
+            }
+            if (cancelled || role.get()) return;
+            if (open) {
+              role.setRole('flow');
+              api.watchDualWindow();
+            } else if (prefs.get().mode === 'dual') {
+              // The window is gone: a stale switch would read as an active pair.
+              prefs.patch({ mode: 'auto' });
+            }
+          })();
+          return () => { cancelled = true; };
+        }, NS + ': dual recovery');
+
+        // ------------------------------------------------------------ session sync
+        // One session, two windows. The context side owns it: it publishes the
+        // session it shows and only follows a session the input side published.
+        // The input side follows the context first and only starts publishing
+        // after it has applied that session, so the blank session its window
+        // boots with can never take the pair over. The Host stamps every publish
+        // with a sequence number, so neither side mistakes an echo for a command.
+        // Plain effect (not ctx.inject): waiting on uiWorkspace with an injected
+        // child scope could stall the client plugin and leave the main window
+        // blank. Resolve the service lazily in open(); if it is not there yet,
+        // the sync simply skips this tick instead of blocking the UI.
+        ctx.effect(() => {
+          let timer = 0;
+          let busy = false;
+          let ready = false;
+          let ownSeq = 0;
+          let followSeq = 0;
+          let flowPublished = '';
+          let promptPublished = '';
+          let applying = false;
+
+          const currentId = () => {
+            const content = document.querySelector('[data-conversation-content]');
+            return content ? (content.getAttribute('data-conversation-session') || '') : '';
+          };
+          const readHost = async () => {
+            const res = await fetch('/dsh-ds-window/session', { cache: 'no-store' });
+            const body = await res.json().catch(() => ({}));
+            return {
+              id: body && typeof body.id === 'string' ? body.id : '',
+              source: body && body.source === 'prompt' ? 'prompt' : 'flow',
+              seq: body && Number.isFinite(body.seq) ? body.seq : 0,
+            };
+          };
+          const writeHost = async (id, source) => {
+            if (!id) return 0;
+            const res = await fetch('/dsh-ds-window/session', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ id, source }),
+            });
+            const body = await res.json().catch(() => ({}));
+            return body && Number.isFinite(body.seq) ? body.seq : 0;
+          };
+          // openSession() swaps the main view before the transcript re-renders.
+          // Wait for the new id to land in the DOM: a follow that publishes the
+          // id still on screen would bounce the two windows back and forth.
+          const open = async (id) => {
+            if (!id || applying) return false;
+            const workspace = ctx.get('uiWorkspace');
+            if (!workspace || typeof workspace.openSession !== 'function') return false;
+            applying = true;
+            try { await workspace.openSession(id); } catch { /* keep the current view */ }
+            applying = false;
+            for (let i = 0; i < 40; i += 1) {
+              if (currentId() === id) return true;
+              await new Promise((resolve) => { window.setTimeout(resolve, 50); });
+            }
+            return currentId() === id;
+          };
+          const run = async () => {
+            const roleNow = role.get();
+            if (!roleNow) return;
+            try {
+              if (roleNow === 'flow') {
+                const id = currentId();
+                if (id && id !== flowPublished) {
+                  flowPublished = id;
+                  ownSeq = await writeHost(id, 'flow');
+                }
+                const host = await readHost();
+                if (host.source === 'prompt' && host.id && host.seq > ownSeq) {
+                  ownSeq = host.seq;
+                  if (host.id !== currentId()) await open(host.id);
+                  flowPublished = currentId();
+                  // Re-stamp the applied session as the context side's own publish,
+                  // so a reloaded input window reads a flow publish and follows it.
+                  ownSeq = await writeHost(flowPublished, 'flow');
+                }
+                return;
+              }
+              if (roleNow !== 'prompt') return;
+              const host = await readHost();
+              if (!ready) {
+                // Nothing to follow yet: keep the window in its boot session and
+                // stay silent until the context side names one.
+                if (!host.id) return;
+                if (host.id !== currentId() && !(await open(host.id))) return;
+                ready = true;
+                followSeq = host.seq;
+                promptPublished = currentId();
+                return;
+              }
+              if (host.source === 'flow' && host.seq > followSeq) {
+                followSeq = host.seq;
+                if (host.id && host.id !== currentId()) await open(host.id);
+                promptPublished = currentId();
+                return;
+              }
+              const id = currentId();
+              if (id && id !== promptPublished) {
+                promptPublished = id;
+                await writeHost(id, 'prompt');
+              }
+            } catch { /* Host not ready */ }
+          };
+          const tick = () => {
+            if (busy) return;
+            busy = true;
+            void run().finally(() => { busy = false; });
+          };
+          // Push first: the Host streams every publish, so the pair follows on an
+          // event instead of a clock. The interval below is only a safety net —
+          // fast while the stream is down, slow (and nearly silent) once it is up.
+          const POLL_FAST = 300;
+          const POLL_SLOW = 8000;
+          const setPoll = (ms) => {
+            if (timer) window.clearInterval(timer);
+            timer = window.setInterval(tick, ms);
+          };
+          setPoll(POLL_FAST);
+          tick();
+
+          // A freshly spawned input window has to find the pair's session fast:
+          // poll at 20ms for the first four seconds, then the normal cadence takes
+          // over (the SSE push usually lands within the first few ticks).
+          let fastTimer = 0;
+          const fastFrom = Date.now();
+          const fastTick = () => {
+            tick();
+            if (Date.now() - fastFrom < 4000) fastTimer = window.setTimeout(fastTick, 20);
+          };
+          if (role.get() === 'prompt') fastTick();
+
+          let events = null;
+          try { events = new EventSource('/dsh-ds-window/events'); } catch { events = null; }
+          if (events) {
+            events.onopen = () => {
+              api.sseLive = true;
+              setPoll(POLL_SLOW);
+              if (api.sseStatus && api.dualWatch) { window.clearInterval(api.dualWatch); api.dualWatch = 0; }
+            };
+            events.onmessage = (event) => {
+              let message = null;
+              try { message = JSON.parse(event.data); } catch { message = null; }
+              if (message && message.type === 'snapshot') {
+                // Only a Host that advertises the status event may drop the
+                // close-watch poll; an older one still relies on it.
+                api.sseStatus = Array.isArray(message.features) && message.features.indexOf('status') !== -1;
+                if (api.sseStatus && api.dualWatch) { window.clearInterval(api.dualWatch); api.dualWatch = 0; }
+                tick();
+                return;
+              }
+              if (message && message.type === 'status') {
+                // The Host pushes the close: the pair ends without a poll.
+                if (message.open === false && role.get() === 'flow') api.resetDual();
+                return;
+              }
+              tick();
+            };
+            events.onerror = () => {
+              api.sseLive = false;
+              api.sseStatus = false;
+              setPoll(POLL_FAST);
+              if (role.get() === 'flow' && !api.dualWatch) api.watchDualWindow();
+            };
+          }
+
+          // A session switch in this window is published right away — waiting for
+          // the next tick used to add a full interval of visible lag.
+          let debounce = 0;
+          let seen = currentId();
+          const onDom = () => {
+            const id = currentId();
+            if (id === seen) return;
+            seen = id;
+            if (debounce || !id) return;
+            debounce = window.setTimeout(() => { debounce = 0; tick(); }, 30);
+          };
+          const dom = new MutationObserver(onDom);
+          if (document.body) {
+            dom.observe(document.body, {
+              childList: true,
+              subtree: true,
+              attributes: true,
+              attributeFilter: ['data-conversation-session'],
+            });
+          }
+          return () => {
+            if (timer) window.clearInterval(timer);
+            if (fastTimer) window.clearTimeout(fastTimer);
+            if (debounce) window.clearTimeout(debounce);
+            dom.disconnect();
+            if (events) { try { events.close(); } catch { /* closed */ } }
+          };
+        }, NS + ': session sync');
+
+        // ---------------------------------------------------- peak send guard
+        // Two jobs: colour the shipped send tooltip with the current period, and
+        // put a one-time second confirmation in front of the first peak-time send
+        // of this launch. The flag lives in sessionStorage, so a UI reload keeps
+        // it but restarting the client resets it.
+        ctx.effect(() => {
+          if (!document.body) return undefined;
+          let bypass = false;
+          let closeDialog = null;
+
+          const decorate = (node) => {
+            if (!(node instanceof Element)) return;
+            const tips = node.matches('[role="tooltip"]') ? [node] : Array.from(node.querySelectorAll('[role="tooltip"]'));
+            for (const tip of tips) decorateSendTooltip(tip);
+          };
+          const observer = new MutationObserver((records) => {
+            for (const record of records) {
+              for (const node of record.addedNodes) decorate(node);
+            }
+          });
+          observer.observe(document.body, { childList: true, subtree: true });
+
+          const replay = (action) => {
+            bypass = true;
+            try {
+              if (action.type === 'click') action.button.click();
+              else action.target.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true,
+              }));
+            } catch { /* the draft stays */ } finally {
+              bypass = false;
+            }
+          };
+
+          const guard = (action) => {
+            if (closeDialog) return;
+            closeDialog = openPeakConfirm(t,
+              () => { closeDialog = null; acknowledgePeak(); replay(action); },
+              () => { closeDialog = null; });
+          };
+
+          const onClickCapture = (ev) => {
+            if (bypass || closeDialog) return;
+            const button = ev.target instanceof Element ? ev.target.closest('button') : null;
+            if (!button) return;
+            const primary = primarySendButton();
+            if (!primary || button !== primary || !isSendAction(primary)) return;
+            if (isValleyTime() || peakAcknowledged()) return;
+            ev.preventDefault();
+            ev.stopImmediatePropagation();
+            guard({ type: 'click', button: primary });
+          };
+
+          const onKeyDownCapture = (ev) => {
+            if (bypass || closeDialog) return;
+            if (ev.key !== 'Enter' || ev.shiftKey || ev.ctrlKey || ev.metaKey || ev.altKey || ev.isComposing) return;
+            const target = ev.target;
+            if (!(target instanceof Element) || !target.closest('[data-composer-seat]')) return;
+            const primary = primarySendButton();
+            if (!primary || primary.disabled || !isSendAction(primary)) return;
+            if (isValleyTime() || peakAcknowledged()) return;
+            ev.preventDefault();
+            ev.stopImmediatePropagation();
+            guard({ type: 'key', target });
+          };
+
+          document.addEventListener('click', onClickCapture, true);
+          document.addEventListener('keydown', onKeyDownCapture, true);
+          return () => {
+            observer.disconnect();
+            document.removeEventListener('click', onClickCapture, true);
+            document.removeEventListener('keydown', onKeyDownCapture, true);
+            if (closeDialog) { try { closeDialog(); } catch { /* gone */ } }
+          };
+        }, NS + ': peak send guard');
 
         // the one stylesheet this plugin owns; removed when the plugin unloads
         ctx.effect(() => {
@@ -1156,59 +1965,51 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
             observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
           }
 
-          // two same-origin windows agree on who is which side
-          let bus = null;
-          const busId = 'w-' + Math.random().toString(36).slice(2);
-          try { bus = new BroadcastChannel(BUS_NAME); } catch { bus = null; }
-          api.busPost = (message) => {
-            if (!bus) return;
-            try { bus.postMessage(Object.assign({ from: busId }, message)); } catch { /* closed */ }
-          };
-          const onBus = (ev) => {
-            const msg = ev && ev.data;
-            if (!msg || msg.from === busId) return;
-            if (msg.type === 'dual-off') {
-              // The context side ended the pair: the input popup closes itself.
-              if (role.get() === 'prompt') {
-                try { window.close(); } catch { /* not script-opened */ }
-              }
-              return;
-            }
-            if (msg.type === 'hello') {
-              const mine = role.get();
-              if (mine) { try { bus.postMessage({ type: 'role', from: busId, role: mine }); } catch { /* closed */ } }
-              return;
-            }
-            if (msg.type === 'role' && !role.get()) {
-              api.setRole(msg.role === 'flow' ? 'prompt' : 'flow');
-            }
-          };
-          if (bus) {
-            bus.addEventListener('message', onBus);
-            try { bus.postMessage({ type: 'hello', from: busId }); } catch { /* closed */ }
-          }
-          const offAnnounce = role.subscribe(() => {
-            if (!bus) return;
-            const mine = role.get();
-            if (mine) { try { bus.postMessage({ type: 'role', from: busId, role: mine }); } catch { /* closed */ } }
-          });
-
           return () => {
             if (frame) window.cancelAnimationFrame(frame);
             offPrefs();
             offRole();
-            offAnnounce();
             window.removeEventListener('resize', onResize);
             if (observer) observer.disconnect();
-            api.busPost = null;
-            if (bus) { bus.removeEventListener('message', onBus); try { bus.close(); } catch { /* closed */ } }
             root.removeAttribute('data-ds-mode');
             root.removeAttribute('data-dsd-animate');
             root.style.removeProperty('--dsd-content-font');
             root.style.removeProperty('--dsd-code-font');
             root.style.removeProperty('--dsd-span-composer');
+            root.style.removeProperty('--dsd-titlebtn-w');
           };
         }, NS + ': mode driver');
+
+        // The input side exists to be typed into. Put the caret in the editor as
+        // soon as the prompt role has rendered, but never pull focus away from a
+        // window the user is already typing in.
+        ctx.effect(() => {
+          let timer = 0;
+          let tries = 0;
+          const attempt = () => {
+            if (role.get() !== 'prompt') return;
+            const editor = document.querySelector('[data-composer-seat] [contenteditable]');
+            if (editor && document.hasFocus()) {
+              try { editor.focus(); } catch { /* not focusable */ }
+              return;
+            }
+            if (tries < 24) {
+              tries += 1;
+              timer = window.setTimeout(attempt, 250);
+            }
+          };
+          if (role.get() === 'prompt') attempt();
+          const off = role.subscribe(() => {
+            if (role.get() !== 'prompt') return;
+            tries = 0;
+            if (timer) window.clearTimeout(timer);
+            attempt();
+          });
+          return () => {
+            if (timer) window.clearTimeout(timer);
+            off();
+          };
+        }, NS + ': prompt focus');
 
         // Measured geometry for the fixed chrome. Everything here has to track a
         // mouse drag frame-by-frame, so it is a ResizeObserver + rAF, never a
@@ -1218,15 +2019,39 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
           const root = document.documentElement;
           let frame = 0;
           let probe = null;
+          let frameProbe = null;
           let watchedKey = -1;
           let watchedSide = [];
 
           const measure = () => {
             const shell = document.querySelector('[data-slot="root"] > *');
-            const columns = shell
+            // The shell writes the three tracks as inline pixels. That template is
+            // the source of truth: this plugin restates it in the pair forms, so
+            // the computed template would only read this plugin's own output.
+            const inlineTemplate = shell ? String(shell.style.gridTemplateColumns || '') : '';
+            const tracks = [];
+            let depth = 0;
+            let start = 0;
+            for (let i = 0; i < inlineTemplate.length; i += 1) {
+              const ch = inlineTemplate[i];
+              if (ch === '(') depth += 1;
+              else if (ch === ')') depth -= 1;
+              else if (depth === 0 && ch === ' ') {
+                if (i > start) tracks.push(inlineTemplate.slice(start, i));
+                start = i + 1;
+              }
+            }
+            if (start < inlineTemplate.length) tracks.push(inlineTemplate.slice(start));
+            const lastPx = (track) => {
+              const values = String(track || '').match(/-?[\d.]+px/g) || [];
+              return values.length ? (parseFloat(values[values.length - 1]) || 0) : 0;
+            };
+            const computedColumns = shell
               ? String(window.getComputedStyle(shell).gridTemplateColumns || '').split(/\s+/).map((value) => parseFloat(value))
               : [];
-            const sidebar = Number.isFinite(columns[0]) ? columns[0] : 0;
+            const sidebar = tracks.length >= 3 && lastPx(tracks[0]) > 0
+              ? lastPx(tracks[0])
+              : (Number.isFinite(computedColumns[0]) ? computedColumns[0] : 0);
             // the reserved caption band, straight off the frame's box: the
             // shell's --dsh-frame-top-clearance is not visible to the overlay layer
             const band = shell ? (parseFloat(window.getComputedStyle(shell).paddingTop) || 0) : 0;
@@ -1250,38 +2075,104 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
               const menuRight = Math.round(menuEl.getBoundingClientRect().right);
               if (menuRight > 0) root.style.setProperty('--dsd-menu-end', (menuRight + 6) + 'px');
             }
+            const titleBtn = document.querySelector('.dsd-titlebtn');
+            if (titleBtn) {
+              const titleWidth = Math.round(titleBtn.getBoundingClientRect().width);
+              if (titleWidth > 0) root.style.setProperty('--dsd-titlebtn-w', titleWidth + 'px');
+            }
 
-            if (sidebar > 0) root.style.setProperty('--dsd-sidebar-w', Math.round(sidebar) + 'px');
+            root.style.setProperty('--dsd-sidebar-w', Math.max(0, Math.round(sidebar)) + 'px');
             const seatEl = document.querySelector('[data-composer-seat]');
+            const cardEl = document.querySelector('[data-composer-card]');
+            if (seatEl && cardEl) {
+              // Side gutter of the composer card; the prompt form reuses it as the
+              // top/bottom margin so the card sits in an even frame.
+              const gutter = Math.round((seatEl.getBoundingClientRect().width - cardEl.getBoundingClientRect().width) / 2);
+              if (gutter > 0) root.style.setProperty('--dsd-composer-gap', gutter + 'px');
+              // The candidate list hangs under the first text line: attachments
+              // (image/file chips) push that line down, so measure it.
+              const editorEl = document.querySelector('[data-composer-seat] [contenteditable]');
+              if (editorEl) {
+                const cardRect = cardEl.getBoundingClientRect();
+                const editorTop = Math.round(editorEl.getBoundingClientRect().top - cardRect.top);
+                const menuTop = Math.max(8, editorTop + 36);
+                root.style.setProperty('--dsd-menu-top', menuTop + 'px');
+                root.style.setProperty('--dsd-menu-shift', Math.max(0, menuTop - 52) + 'px');
+              }
+            }
             if (seatEl) {
               const seatLeft = Math.round(seatEl.getBoundingClientRect().left);
               if (seatLeft > 0) root.style.setProperty('--dsd-divider-x', seatLeft + 'px');
             }
+            // Entering the pair collapses the shell's OWN sidebar: the flow form
+            // hides the column anyway, and leaving the shell's state expanded kept
+            // its reserved width and seam border behind the transcript.
+            const toggleSidebar = () => {
+              const layout = ctx.get('layout');
+              if (layout && typeof layout.toggleSidebar === 'function') {
+                try { layout.toggleSidebar(); return true; } catch { /* ignore */ }
+              }
+              const first = shell ? shell.firstElementChild : null;
+              const button = first ? first.querySelector('button[class*="toggle"], button[class*="Toggle"]') : null;
+              if (button) { button.click(); return true; }
+              return false;
+            };
+            if (role.get() === 'flow') {
+              if (sidebar > 0 && !api.flowCollapsePending) {
+                api.flowCollapsePending = true;
+                api.flowCollapsedSidebar = toggleSidebar() === true;
+              }
+            } else {
+              if (api.flowCollapsePending) {
+                // Leaving the pair lets the next entry collapse again.
+                api.flowCollapsePending = false;
+              }
+              if (api.flowCollapsedSidebar && sidebar === 0) {
+                // ...and gives the sidebar back on the way out.
+                api.flowCollapsedSidebar = false;
+                toggleSidebar();
+              }
+            }
+
             // the rail state drives the caption-corner plate
             const isRail = sidebar < 120;
             root.setAttribute('data-dsd-rail', isRail ? '1' : '0');
             if (ui.get().rail !== isRail) ui.set({ rail: isRail });
 
-            // The grid track is the authority: it collapses to 0 when the right
-            // sidebar closes. The panel element can outlive the close with a stale
-            // inline width, so it only refines the value while the track is open.
-            const column = document.querySelector('[data-rightbar-col]');
-            const panelEl = document.querySelector('[data-sidebar-right-panel]');
+            // The third inline track is the shipped right-sidebar width (0px while
+            // that panel is closed). Reading it back keeps the flow form's restated
+            // template faithful to whatever width the shell chose.
             const fullscreen = Boolean(shell && shell.hasAttribute('data-rightbar-fullscreen'));
             const collapsed = Boolean(shell && shell.hasAttribute('data-rightbar-collapsed'));
-            const columnWidth = column ? column.getBoundingClientRect().width : 0;
-            const panelWidth = panelEl ? panelEl.getBoundingClientRect().width : 0;
-            const rightbar = (!fullscreen && !collapsed && columnWidth > 1)
-              ? Math.max(columnWidth, panelWidth)
-              : 0;
-            if (rightbar > 0) root.style.setProperty('--dsd-rightbar-w', Math.round(rightbar) + 'px');
-            else root.style.removeProperty('--dsd-rightbar-w');
+            const rightbar = (!fullscreen && !collapsed && tracks.length >= 3) ? lastPx(tracks[2]) : 0;
+            // The pair form restates the shell's own template, only zeroing the
+            // sidebar column. Copying the tracks verbatim keeps the divider, the
+            // panel width and the centre floor in lockstep with the shell.
+            if (tracks.length >= 3) {
+              // In fullscreen presentation the panel floats over the frame and the
+              // column must not reserve its width: copying the track verbatim left
+              // a blank strip the width of the panel beside the transcript.
+              const third = fullscreen ? '0px' : tracks[2];
+              root.style.setProperty('--dsd-flow-tracks', '0px ' + tracks[1] + ' ' + third);
+            } else {
+              root.style.removeProperty('--dsd-flow-tracks');
+            }
+            if (rightbar > 0) {
+              root.style.setProperty('--dsd-rightbar-w', Math.round(rightbar) + 'px');
+              // The shell protects CENTER_MIN (400) while the right column is
+              // open; restating the grid must keep that floor.
+              root.style.setProperty('--dsd-center-min', '400px');
+            } else {
+              root.style.removeProperty('--dsd-rightbar-w');
+              root.style.removeProperty('--dsd-center-min');
+            }
 
             const avail = Math.max(320, window.innerWidth - sidebar - rightbar);
             api.avail = avail;
             api.rightbar = rightbar;
             const split = Math.min(0.62, Math.max(0.16, Number(prefs.get().split) || 0.26));
-            const panel = Math.round(Math.min(Math.max(avail * split, 340), 960));
+            // Same contract as the shell's right column: RIGHTBAR_MIN 300 .. 0.7 of the frame.
+            const panel = Math.min(Math.round(avail * 0.7), Math.max(300, Math.round(avail * split)));
             root.style.setProperty('--dsd-panel-eff', panel + 'px');
 
             const header = document.querySelector('[data-slot="conversation.header"] > *');
@@ -1311,6 +2202,15 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
               probe = new ResizeObserver(schedule);
               for (const el of targets) probe.observe(el);
             }
+            // Dragging the right divider rewrites only the frame's inline
+            // template; the column can keep its width, so a ResizeObserver alone
+            // left --dsd-rightbar-w stale and the panel stopped growing early.
+            if (frameProbe) frameProbe.disconnect();
+            const frameEl = document.querySelector('[data-slot="root"] > *');
+            if (frameEl && typeof MutationObserver === 'function') {
+              frameProbe = new MutationObserver(schedule);
+              frameProbe.observe(frameEl, { attributes: true, attributeFilter: ['style'] });
+            }
           };
 
           bind();
@@ -1331,11 +2231,16 @@ html[data-ds-mode="span"][data-dsd-rail="1"] [data-windows-menu] {
             offRole();
             window.removeEventListener('resize', schedule);
             if (probe) probe.disconnect();
+            if (frameProbe) frameProbe.disconnect();
+            root.style.removeProperty('--dsd-flow-tracks');
             root.style.removeProperty('--dsd-header-h');
             root.style.removeProperty('--dsd-rightbar-w');
             root.style.removeProperty('--dsd-panel-eff');
             root.style.removeProperty('--dsd-sidebar-w');
             root.style.removeProperty('--dsd-gutter');
+            root.style.removeProperty('--dsd-composer-gap');
+            root.style.removeProperty('--dsd-menu-top');
+            root.style.removeProperty('--dsd-menu-shift');
             root.removeAttribute('data-dsd-menu');
           };
         }, NS + ': measured chrome');

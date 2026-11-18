@@ -1,4 +1,8 @@
 # dsh-dualscreen bundle patch: inserts the adaptive-layout row.
+# The row must declare its Host injections: this Loader reads the row's `inject`
+# field, and the manifest's `export const inject` alone does not reach the fiber.
+# `webServer` is needed for the native input-window route.
 - insert:
     - id: dsh-dualscreen
       name: 'dsh-dualscreen'
+      inject: [connection, webServer]

@@ -1,9 +1,9 @@
 {
   "name": "dsh-dualscreen",
-  "version": "1.1.0",
+  "version": "1.6.14",
   "private": true,
   "type": "module",
-  "description": "Adaptive window layouts for the DeepSeek Harness Web GUI on ASUS Duo series laptops and ultrawide monitors.",
+  "description": "Adaptive window layouts for the DeepSeek Harness Web GUI on ASUS Duo series laptops and ultrawide monitors, with an optional native input window.",
   "icon": "./icon.png",
   "exports": {
     ".": "./index.js",
@@ -15,6 +15,7 @@
     "index.js",
     "client.js",
     "cordis.patch.yml",
+    "helper",
     "locale/*.json",
     "icon.png",
     "docs"
